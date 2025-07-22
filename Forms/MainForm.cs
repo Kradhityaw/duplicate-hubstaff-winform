@@ -11,21 +11,29 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Imaging;
 using Gma.System.MouseKeyHook;
+using System.Runtime.InteropServices; // Untuk P/Invoke
 
 namespace TimeTracker.Forms
 {
     public partial class MainForm : Form
     {
-        private IKeyboardMouseEvents _globalHook; // Inisialisasi hook dari interface KeyboardMouseEvents
-        private int _keyboardActivityCount = 0;   // Inisialisasi state untuk menghitung aktivitas keyboard
-        private int _mouseActivityCount = 0;      // Inisialisasi state untuk menghitung aktivitas mouse
-        private Timer _timer;
-        private Timer _screenshotTimer;           // Inisialisasi timer untuk screenshot
-        private Timer _activityTimer;             // Inisialisasi timer untuk deteksi aktivitas mouse dan keyboard
-        private DateTime _startTime;              // Inisialisasi state untuk waktu mulai
-        private bool _tracking;                   // Inisialisasi state toggle tracking
+        // P/Invoke untuk deteksi idle
+        [StructLayout(LayoutKind.Sequential)]
+        struct LASTINPUTINFO
+        {
+            public uint cbSize;
+            public uint dwTime;
+        }
+        [DllImport("user32.dll")]
+        static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
-        // Inisialisasi csv untuk menyimpan log
+        private Timer _timer;              // Timer untuk tracking durasi kerja
+        private Timer _screenshotTimer;    // Timer untuk mengambil screenshot
+        private Timer _activityTimer;      // Timer untuk deteksi idle
+        private DateTime _startTime;       // Waktu dimulainya tracking
+        private bool _tracking;            // State flag tracking
+
+        // Path untuk file csv yang digunakan untuk menyimpan log
         private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv");
         // Inisialisasi folder untuk menyimpan screenshot
         private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots");
@@ -33,49 +41,54 @@ namespace TimeTracker.Forms
         public MainForm()
         {
             InitializeComponent();   // Insialisasi komponen UI
-            SetupTimer();            // Inisialisasi timer
-            EnsureLogFile();         // Inisialisasi file csv untuk menyimpan aktivitas
-            SetupActivityTracking(); // Inisialisasi method untuk fitur sctivity tracking
+            SetupTimer();            // Setup semua timer
+            EnsureLogFile();         // Menyiapkan file log
         }
 
-        private void SetupActivityTracking()
-        {
-            // Mulai hook global mouse & keyboard
-            _globalHook = Hook.GlobalEvents();
-
-            // Set state ke keyboardActivity dan mouseActivity ketika event terjadi
-            _globalHook.KeyDown += (s, e) => _keyboardActivityCount++;
-            _globalHook.MouseMove += (s, e) => _mouseActivityCount++;
-            _globalHook.MouseClick += (s, e) => _mouseActivityCount++;
-        }
-
-        // Fungsi untuk setup timer set interval dan event ketika timer berjalan
+        // Setup timer untuk tracking durasi kerja, screenshot, dan deteksi idle
         private void SetupTimer()
         {
-            _timer = new Timer { Interval = 1000 };            // 1 detik untuk memperbarui User Interface
-            _screenshotTimer = new Timer { Interval = 60000 }; // 1 menit untuk setiap waktu mengambil tangkapan layar
-            _activityTimer = new Timer { Interval = 10000 };   // Timer untuk evaluasi aktivitas setiap 10 detik
-
+            // Timer untuk durasi kerja, Akan memperbarui ui setiap detik
+            _timer = new Timer { Interval = 1000 };
             _timer.Tick += Timer_Tick;
+
+            // Timer untuk screenshot, dengan default setiap 60 detik
+            _screenshotTimer = new Timer { Interval = 60000 };
             _screenshotTimer.Tick += ScreenshotTimer_Tick;
-            _activityTimer.Tick += ActivityTimer_Tick; 
+
+            // Timer untuk deteksi idle, dengan default setiap 10 detik
+            _activityTimer = new Timer { Interval = 10000 };
+            _activityTimer.Tick += ActivityTimer_Tick;
         }
 
+        // Cek waktu idle dan perbarui label
         private void ActivityTimer_Tick(object sender, EventArgs e)
         {
-            bool isIdle = _keyboardActivityCount == 0 && _mouseActivityCount == 0;
-            string status = isIdle
-                ? "Idle"
-                : $"Active | Keys: {_keyboardActivityCount}, Mouse: {_mouseActivityCount}";
+            // Mendapatkan waktu idle berupa milidetik
+            LASTINPUTINFO lastInput = new LASTINPUTINFO();
+            lastInput.cbSize = (uint)Marshal.SizeOf(lastInput);
+            GetLastInputInfo(ref lastInput);
+            uint idleTime = (uint)Environment.TickCount - lastInput.dwTime;
 
-            listLog.Items.Add($"{DateTime.Now:HH:mm:ss} - {status}");
-            labelActivity.Text = $"Activity Status: {status}";
-            labelActivity.ForeColor = isIdle ? Color.Red : Color.Green;
-            _keyboardActivityCount = 0;
-            _mouseActivityCount = 0;
+            bool isIdle = idleTime >= _activityTimer.Interval;
+
+            // Update tampilan label
+            if (isIdle)
+            {
+                labelActivity.Text = "Activity Status: Idle";
+                labelActivity.ForeColor = Color.Red;
+            }
+            else
+            {
+                labelActivity.Text = "Activity Status: Active";
+                labelActivity.ForeColor = Color.Green;
+            }
+
+            // Log status
+            listLog.Items.Add($"{DateTime.Now:HH:mm:ss} - {(isIdle ? "Idle" : "Active")} (Idle {idleTime/1000}s)");
         }
 
-        // Fungsi ketika timer dari screenshot berjalan setiap tick berdasarkan interval
+        // Ambil scrennshot dari semua monitor dan simpan gambarnya
         private void ScreenshotTimer_Tick(object sender, EventArgs e)
         {
             try
@@ -110,13 +123,14 @@ namespace TimeTracker.Forms
             }
         }
 
-        // Fungsi ketika timer sedang berjalan
+        // Memperbarui durasi kerja di UI
         private void Timer_Tick(object sender, EventArgs e)
         {
             var elapsed = DateTime.Now - _startTime;
             labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}";
         }
 
+        // Memulai tracking
         private void btnStart_Click(object sender, EventArgs e)
         {
             if (_tracking) return;      // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
@@ -126,55 +140,40 @@ namespace TimeTracker.Forms
             _screenshotTimer.Start();
             _activityTimer.Start();
 
-            _tracking = true;          // Set state _tracking ke true
+            _tracking = true;          // Set state flag _tracking ke true
             btnStart.Enabled = false;
             btnStop.Enabled = true;
 
             LogEntry("START", _startTime);
         }
 
+        // Stop tracking
         private void btnStop_Click(object sender, EventArgs e)
         {
-            if (!_tracking) return;               // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
-            var stopTime = DateTime.Now;          // Untuk menyimpan waktu berhenti
-            var elapsed = stopTime - _startTime;  // Untuk menghitung waktu yang telah berlalu
+            if (!_tracking) return;    // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
 
             _timer.Stop();
             _screenshotTimer.Stop();
             _activityTimer.Stop();
 
-            _tracking = false;                    // Set state _tracking ke false
+            _tracking = false;         // Set state flag _tracking ke false
             btnStart.Enabled = true;
             btnStop.Enabled = false;
 
             labelStatus.Text = "Not Tracking";
 
-            _keyboardActivityCount = 0;
-            _mouseActivityCount = 0;
-
-            LogEntry("STOP", stopTime, elapsed);
-
-            // Menambahkan log ke dalam listBox
-            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}");
+            LogEntry("STOP", DateTime.Now, DateTime.Now - _startTime);
         }
 
-        // Fungsi untuk mengecek keberadaan file csv untuk menyimpan log
+        // Memastikan log CSV telah ada atau buat baru
         private void EnsureLogFile()
         {
             // Jika file belum ada maka buat file dan tambahkan isi dari header csv
             if (!File.Exists(_logFile))
                 File.WriteAllText(_logFile, "Event,TimeStamp,Duration\r\n");
-            else
-            {
-                var lines = File.ReadAllLines(_logFile);                      // Membaca file csv
-                foreach (var line in lines)
-                {
-                    if (line.StartsWith("START") || line.StartsWith("STOP"))  // Validasi file csv berdasarkan column Event
-                        listLog.Items.Add(line);                              // Menambahkan log ke dalam listBox dari file csv
-                }
-            }
         }
 
+        // Menambahkan event, beserta dengan waktu kerja ke dalam log
         private void LogEntry(string eventType, DateTime timestamp, TimeSpan? duration = null)
         {
             var line = duration == null
@@ -183,13 +182,13 @@ namespace TimeTracker.Forms
             File.AppendAllText(_logFile, line + "\r\n");
         }
 
+        // Berhentikan timer ketika form ditutup
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             // Stop semua timer saat form ditutup agar tidak tejadi StackOverflowException
             _timer?.Stop();
             _screenshotTimer?.Stop();
             _activityTimer?.Stop();
-            _globalHook?.Dispose(); // Memastikan hook dimatikan saat form ditutup
         }
     }
 }
