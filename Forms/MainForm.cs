@@ -10,13 +10,18 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Imaging;
+using Gma.System.MouseKeyHook;
 
 namespace TimeTracker.Forms
 {
     public partial class MainForm : Form
     {
+        private IKeyboardMouseEvents _globalHook; // Inisialisasi hook dari interface KeyboardMouseEvents
+        private int _keyboardActivityCount = 0; // Inisialisasi state untuk menghitung aktivitas keyboard
+        private int _mouseActivityCount = 0; // Inisialisasi state untuk menghitung aktivitas mouse
         private Timer _timer; // Insialisasi timer
         private Timer _screenshotTimer; // Inisialisasi timer untuk screenshot
+        private Timer _activityTimer; // Inisialisasi timer untuk deteksi aktivitas mouse dan keyboard
         private DateTime _startTime; // Inisialisasi waktu mulai
         private bool _tracking; // Inisialisasi toggle/state tracking
         private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv"); // Inisialisasi csv untuk menyimpan log
@@ -27,14 +32,43 @@ namespace TimeTracker.Forms
             InitializeComponent(); // Insialisasi komponen UI
             SetupTimer(); // Inisialisasi timer
             EnsureLogFile(); // Inisialisasi file csv untuk menyimpan aktivitas
+            SetupActivityTracking(); // Inisialisasi method untuk fitur sctivity tracking
+        }
+
+        private void SetupActivityTracking()
+        {
+            // Mulai hook global mouse & keyboard
+            _globalHook = Hook.GlobalEvents();
+
+            // Set state ke keyboardActivity dan mouseActivity ketika event terjadi
+            _globalHook.KeyDown += (s, e) => _keyboardActivityCount++;
+            _globalHook.MouseMove += (s, e) => _mouseActivityCount++;
+            _globalHook.MouseClick += (s, e) => _mouseActivityCount++;
         }
 
         private void SetupTimer() // Fungsi untuk setup timer set interval dan event ketika timer berjalan
         {
             _timer = new Timer { Interval = 1000 }; // 1 detik untuk memperbarui User Interface
             _screenshotTimer = new Timer { Interval = 60000 }; // 1 menit untuk setiap waktu mengambil tangkapan layar
+            _activityTimer = new Timer { Interval = 10000 }; // Timer untuk evaluasi aktivitas setiap 10 detik
+
             _timer.Tick += Timer_Tick; // Menerapkan event _timer.Tick ke method Timer_Tick
             _screenshotTimer.Tick += ScreenshotTimer_Tick; // Menerapkan event _screenshotTimer.Tick ke method ScreenshotTimer_Tick
+            _activityTimer.Tick += ActivityTimer_Tick;
+        }
+
+        private void ActivityTimer_Tick(object sender, EventArgs e)
+        {
+            bool isIdle = _keyboardActivityCount == 0 && _mouseActivityCount == 0;
+            string status = isIdle
+                ? "Idle"
+                : $"Active | Keys: {_keyboardActivityCount}, Mouse: {_mouseActivityCount}";
+
+            listLog.Items.Add($"{DateTime.Now:HH:mm:ss} - {status}");
+            labelActivity.Text = $"Activity Status: {status}";
+            labelActivity.ForeColor = isIdle ? Color.Red : Color.Green;
+            _keyboardActivityCount = 0;
+            _mouseActivityCount = 0;
         }
 
         private void ScreenshotTimer_Tick(object sender, EventArgs e) // Fungsi ketika timer dari screenshot berjalan setiap tick berdasarkan interval
@@ -79,7 +113,8 @@ namespace TimeTracker.Forms
             if (_tracking) return; // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
             _startTime = DateTime.Now; // Menetapkan waktu memulai
             _timer.Start(); // Menjalankan timer
-            _screenshotTimer.Start();
+            _screenshotTimer.Start(); // Menjalankan timer screenshot
+            _activityTimer.Start(); // Menjalankan timer untuk activity detection
             _tracking = true; // Set state _tracking ke true
             btnStart.Enabled = false; // Disable button start
             btnStop.Enabled = true; // Enable button stop
@@ -90,14 +125,17 @@ namespace TimeTracker.Forms
         {
             if (!_tracking) return; // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
             _timer.Stop(); // Berhentikan timer
-            _screenshotTimer.Stop();
+            _screenshotTimer.Stop(); // Menjalankan timer screenshot
+            _activityTimer.Stop(); // Menjalankan timer untuk activity detection
             var stopTime = DateTime.Now; // Untuk menyimpan waktu berhenti
             var elapsed = stopTime - _startTime; // Untuk menghitung waktu yang telah berlalu
             _tracking = false; // Set state _tracking ke false
             btnStart.Enabled = true; // Enable button start
             btnStop.Enabled = false; // Disable button start
             labelStatus.Text = "Not Tracking"; // Set label status ke "Not Tracking"
-            LogEntry("STOP", stopTime, elapsed); 
+            _keyboardActivityCount = 0; // Set state aktivitas keyboard ke 0
+            _mouseActivityCount = 0; // Set state aktivitas mouse ke 0
+            LogEntry("STOP", stopTime, elapsed);
             listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
         }
 
@@ -122,6 +160,15 @@ namespace TimeTracker.Forms
                 ? $"{eventType},{timestamp:yyyy-MM-dd HH:mm:ss}," // Ketika start time
                 : $"{eventType},{timestamp:yyyy-MM-dd HH:mm:ss},{duration:hh\\:mm\\:ss}";
             File.AppendAllText(_logFile, line + "\r\n");
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // Stop semua timer saat form ditutup agar tidak tejadi StackOverflowException
+            _timer?.Stop();
+            _screenshotTimer?.Stop();
+            _activityTimer?.Stop();
+            _globalHook?.Dispose(); // Memastikan hook dimatikan saat form ditutup
         }
     }
 }
