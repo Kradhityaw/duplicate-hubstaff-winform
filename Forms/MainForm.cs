@@ -80,16 +80,24 @@ namespace TimeTracker.Forms
         {
             try
             {
-                var timestamp = DateTime.Now;                                    // Menyimpan waktu untuk nama sub-direktori untuk menyimpan screenshot
+                var timestamp = DateTime.Now;
+
+                // Membuat sub-direktori untuk menyimpan screenshot
                 var dateFolder = Path
-                    .Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd"));  // Membuat sub-direktori untuk menyimpan screenshot
-                if (!Directory.Exists(dateFolder))                               // Validasi jika direkti screenschot belum ada, maka buat direktori
+                    .Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd"));
+
+                // Validasi jika direktori screenschot belum ada, maka buat direktori
+                if (!Directory.Exists(dateFolder))
                     Directory.CreateDirectory(dateFolder);
 
-                foreach (var screen in Screen.AllScreens)                        // Mendapatkan tampilan dari semua layar yang terdeteksi
+                // Mendapatkan tampilan dari semua layar yang terdeteksi
+                foreach (var screen in Screen.AllScreens)
                 {
-                    Rectangle bounds = screen.Bounds;                            // Mendapatkan dimensi dari layar
-                    using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height)) // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka
+                    // Mendapatkan dimensi dari layar
+                    Rectangle bounds = screen.Bounds;
+
+                    // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka
+                    using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
                     {
                         using (Graphics g = Graphics.FromImage(bmp))
                         {
@@ -98,15 +106,19 @@ namespace TimeTracker.Forms
 
                         // Membuat filename screenshotnya
                         string fileName = Path.Combine(dateFolder, $"screen_{screen.DeviceName.Replace('\\', '_')}_{timestamp:HHmmss}.png");
-                        bmp.Save(fileName, ImageFormat.Png);                     // Menyimpan gambar dengan format .png
+
+                        // Menyimpan gambar dengan format .png
+                        bmp.Save(fileName, ImageFormat.Png);
                     }
                 }
 
-                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}");    // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
+                // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
+                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}");
             }
             catch (Exception ex)
             {
-                listLog.Items.Add($"Screenshot error: {ex.Message}");            // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
+                // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
+                listLog.Items.Add($"Screenshot error: {ex.Message}");
             }
         }
 
