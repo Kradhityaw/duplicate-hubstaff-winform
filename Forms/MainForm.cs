@@ -17,7 +17,7 @@ namespace TimeTracker.Forms
     public partial class MainForm : Form
     {
         private Timer _timer; // Insialisasi timer
-        private Timer _screenshotTimer;
+        private Timer _screenshotTimer; // Inisialisasi timer untuk screenshot
         private DateTime _startTime; // Inisialisasi waktu mulai
         private bool _tracking; // Inisialisasi toggle/state tracking
         private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv"); // Inisialisasi csv untuk menyimpan log
