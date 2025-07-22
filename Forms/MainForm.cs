@@ -95,7 +95,9 @@ namespace TimeTracker.Forms
                         {
                             g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
                         }
-                        string fileName = Path.Combine(dateFolder, $"screen_{screen.DeviceName.Replace('\\', '_')}_{timestamp:HHmmss}.png"); // Membuat filename screenshotnya
+
+                        // Membuat filename screenshotnya
+                        string fileName = Path.Combine(dateFolder, $"screen_{screen.DeviceName.Replace('\\', '_')}_{timestamp:HHmmss}.png");
                         bmp.Save(fileName, ImageFormat.Png);                     // Menyimpan gambar dengan format .png
                     }
                 }
@@ -104,7 +106,7 @@ namespace TimeTracker.Forms
             }
             catch (Exception ex)
             {
-                listLog.Items.Add($"Screenshot error: {ex.Message}"); // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
+                listLog.Items.Add($"Screenshot error: {ex.Message}");            // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
             }
         }
 
@@ -119,31 +121,41 @@ namespace TimeTracker.Forms
         {
             if (_tracking) return;      // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
             _startTime = DateTime.Now;  // Menetapkan waktu memulai
+
             _timer.Start();
             _screenshotTimer.Start();
             _activityTimer.Start();
+
             _tracking = true;          // Set state _tracking ke true
             btnStart.Enabled = false;
             btnStop.Enabled = true;
+
             LogEntry("START", _startTime);
         }
 
         private void btnStop_Click(object sender, EventArgs e)
         {
             if (!_tracking) return;               // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
+            var stopTime = DateTime.Now;          // Untuk menyimpan waktu berhenti
+            var elapsed = stopTime - _startTime;  // Untuk menghitung waktu yang telah berlalu
+
             _timer.Stop();
             _screenshotTimer.Stop();
             _activityTimer.Stop();
-            var stopTime = DateTime.Now;          // Untuk menyimpan waktu berhenti
-            var elapsed = stopTime - _startTime;  // Untuk menghitung waktu yang telah berlalu
+
             _tracking = false;                    // Set state _tracking ke false
             btnStart.Enabled = true;
             btnStop.Enabled = false;
+
             labelStatus.Text = "Not Tracking";
+
             _keyboardActivityCount = 0;
             _mouseActivityCount = 0;
+
             LogEntry("STOP", stopTime, elapsed);
-            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
+
+            // Menambahkan log ke dalam listBox
+            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}");
         }
 
         // Fungsi untuk mengecek keberadaan file csv untuk menyimpan log
