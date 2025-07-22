@@ -1,126 +1,196 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Drawing;
 using System.Drawing.Imaging;
+using Gma.System.MouseKeyHook;
 
 namespace TimeTracker.Forms
 {
     public partial class MainForm : Form
     {
-        private Timer _timer; // Insialisasi timer
-        private Timer _screenshotTimer; // Inisialisasi timer untuk screenshot
-        private DateTime _startTime; // Inisialisasi waktu mulai
-        private bool _tracking; // Inisialisasi toggle/state tracking
-        private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv"); // Inisialisasi csv untuk menyimpan log
-        private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots"); // Inisialisasi folder untuk menyimpan screenshot
+        private IKeyboardMouseEvents _globalHook;   // Untuk menangkap event keyboard dan mouse
+        private Timer _timer;                       // Timer untuk tracking durasi kerja
+        private Timer _screenshotTimer;             // Timer untuk mengambil screenshot
+        private Timer _activityTimer;               // Timer untuk deteksi idle
+        private DateTime _startTime;                // Waktu dimulainya tracking
+        private bool _tracking;                     // State flag tracking
+        private int _keyboardActivityCount = 0;     // State flag hitung aktivitas keyboard
+        private int _mouseActivityCount = 0;        // State flag hitung aktivitas mouse
+
+        // Path untuk file csv yang digunakan untuk menyimpan log
+        private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv");
+        // Path direktori yang digunakan untuk menyimpan screenshot
+        private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots");
 
         public MainForm()
         {
-            InitializeComponent(); // Insialisasi komponen UI
-            SetupTimer(); // Inisialisasi timer
-            EnsureLogFile(); // Inisialisasi file csv untuk menyimpan aktivitas
+            InitializeComponent();   // Insialisasi komponen UI
+            SetupTimer();            // Setup semua timer
+            EnsureLogFile();         // Menyiapkan file log
+            SetupActivityTracking(); // Setup tracking aktivitas keyboard dan mouse
         }
 
-        private void SetupTimer() // Fungsi untuk setup timer set interval dan event ketika timer berjalan
+        // Setup timer untuk tracking durasi kerja, screenshot, dan deteksi idle
+        private void SetupTimer()
         {
-            _timer = new Timer { Interval = 1000 }; // 1 detik untuk memperbarui User Interface
-            _screenshotTimer = new Timer { Interval = 60000 }; // 1 menit untuk setiap waktu mengambil tangkapan layar
-            _timer.Tick += Timer_Tick; // Menerapkan event _timer.Tick ke method Timer_Tick
-            _screenshotTimer.Tick += ScreenshotTimer_Tick; // Menerapkan event _screenshotTimer.Tick ke method ScreenshotTimer_Tick
+            // Timer untuk durasi kerja, Akan memperbarui ui setiap detik
+            _timer = new Timer { Interval = 1000 };
+            _timer.Tick += Timer_Tick;
+
+            // Timer untuk screenshot, dengan default setiap 60 detik
+            _screenshotTimer = new Timer { Interval = 60000 };
+            _screenshotTimer.Tick += ScreenshotTimer_Tick;
+
+            // Timer untuk deteksi idle, dengan default setiap 10 detik
+            _activityTimer = new Timer { Interval = 10000 };
+            _activityTimer.Tick += ActivityTimer_Tick;
         }
 
-        private void ScreenshotTimer_Tick(object sender, EventArgs e) // Fungsi ketika timer dari screenshot berjalan setiap tick berdasarkan interval
+        private void SetupActivityTracking()
+        {
+            // Menginisialisasi global hook untuk menangkap event keyboard dan mouse
+            _globalHook = Hook.GlobalEvents();
+
+            // Set state ke keyboardActivity dan mouseActivity ketika event terjadi
+            _globalHook.KeyDown += (s, e) => _keyboardActivityCount++;   // Menangkap event key press
+            _globalHook.MouseMove += (s, e) => _mouseActivityCount++;    // Menangkap event mouse move
+            _globalHook.MouseClick += (s, e) => _mouseActivityCount++;   // Menangkap event mouse click
+        }
+
+        // Cek waktu idle dan perbarui label
+        private void ActivityTimer_Tick(object sender, EventArgs e)
+        {
+            // Cek apakah tidak ada aktivitas keyboard dan mouse
+            bool isIdle = _keyboardActivityCount == 0 && _mouseActivityCount == 0;
+            string status = isIdle ? "Idle" : "Active";
+
+            labelActivity.Text = $"Activity Status: {status}";            // Update label activity status
+            labelActivity.ForeColor = isIdle ? Color.Red : Color.Green;   // Update warna label activity status
+
+            // Log status
+            listLog.Items.Add($"{DateTime.Now:HH:mm:ss} - Activity Status: {status}");
+
+            _keyboardActivityCount = 0; // Reset hitung aktivitas keyboard
+            _mouseActivityCount = 0;    // Reset hitung aktivitas mouse
+        }
+
+        // Ambil screenshot dari semua monitor dan simpan gambarnya
+        private void ScreenshotTimer_Tick(object sender, EventArgs e)
         {
             try
             {
-                var timestamp = DateTime.Now; // Menyimpan waktu untuk nama sub-direktori untuk menyimpan screenshot
-                var dateFolder = Path.Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd")); // Membuat sub-direktori untuk menyimpan screenshot
-                if (!Directory.Exists(dateFolder)) // Validasi jika direkti screenschot belum ada, maka buat direktori
+                var timestamp = DateTime.Now;
+
+                // Membuat sub-direktori untuk menyimpan screenshot
+                var dateFolder = Path
+                    .Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd"));
+
+                // Validasi jika direktori screenschot belum ada, maka buat direktori
+                if (!Directory.Exists(dateFolder))
                     Directory.CreateDirectory(dateFolder);
 
-                var filename = Path.Combine(dateFolder, $"screenshot_{timestamp:HHmmss}.png"); // Membuat filename screenshotnya
-
-                var screenBounds = Screen.PrimaryScreen.Bounds; // Mengambil screen yang sedang dibuka
-                using (Bitmap bmp = new Bitmap(screenBounds.Width, screenBounds.Height)) // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka tadi
+                // Mendapatkan tampilan dari semua layar yang terdeteksi
+                foreach (var screen in Screen.AllScreens)
                 {
-                    using (Graphics g = Graphics.FromImage(bmp))
+                    // Mendapatkan dimensi dari layar
+                    Rectangle bounds = screen.Bounds;
+
+                    // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka
+                    using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
                     {
-                        g.CopyFromScreen(screenBounds.Location, Point.Empty, screenBounds.Size);
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                        }
+
+                        // Membuat filename screenshotnya
+                        string fileName = Path.Combine(dateFolder, $"screen_{screen.DeviceName.Replace('\\', '_')}_{timestamp:HHmmss}.png");
+
+                        // Menyimpan gambar dengan format .png
+                        bmp.Save(fileName, ImageFormat.Png);
                     }
-                    bmp.Save(filename, ImageFormat.Png); // Menyimpan gambar dengan format .png
                 }
 
-                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}"); // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
+                // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
+                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}");
             }
             catch (Exception ex)
             {
-                listLog.Items.Add($"Screenshot error: {ex.Message}"); // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
+                // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
+                listLog.Items.Add($"Screenshot error: {ex.Message}");
             }
         }
 
-        private void Timer_Tick(object sender, EventArgs e) // Fungsi ketika timer sedang berjalan
+        // Memperbarui durasi kerja di UI
+        private void Timer_Tick(object sender, EventArgs e)
         {
-            var elapsed = DateTime.Now - _startTime; // Membuat seperti stopwatch
-            labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}"; // Set stopwatch ke label
+            var elapsed = DateTime.Now - _startTime;
+            labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}";
         }
 
+        // Memulai tracking
         private void btnStart_Click(object sender, EventArgs e)
         {
-            if (_tracking) return; // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
-            _startTime = DateTime.Now; // Menetapkan waktu memulai
-            _timer.Start(); // Menjalankan timer
+            if (_tracking) return;      // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
+            _startTime = DateTime.Now;  // Menetapkan waktu memulai
+
+            _timer.Start();
             _screenshotTimer.Start();
-            _tracking = true; // Set state _tracking ke true
-            btnStart.Enabled = false; // Disable button start
-            btnStop.Enabled = true; // Enable button stop
+            _activityTimer.Start();
+
+            _tracking = true;          // Set state flag _tracking ke true
+            btnStart.Enabled = false;
+            btnStop.Enabled = true;
+
             LogEntry("START", _startTime);
         }
 
+        // Stop tracking
         private void btnStop_Click(object sender, EventArgs e)
         {
-            if (!_tracking) return; // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
-            _timer.Stop(); // Berhentikan timer
+            if (!_tracking) return;    // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
+
+            _timer.Stop();
             _screenshotTimer.Stop();
-            var stopTime = DateTime.Now; // Untuk menyimpan waktu berhenti
-            var elapsed = stopTime - _startTime; // Untuk menghitung waktu yang telah berlalu
-            _tracking = false; // Set state _tracking ke false
-            btnStart.Enabled = true; // Enable button start
-            btnStop.Enabled = false; // Disable button start
-            labelStatus.Text = "Not Tracking"; // Set label status ke "Not Tracking"
-            LogEntry("STOP", stopTime, elapsed); // 
-            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
+            _activityTimer.Stop();
+
+            _tracking = false;         // Set state flag _tracking ke false
+            btnStart.Enabled = true;
+            btnStop.Enabled = false;
+
+            labelStatus.Text = "Not Tracking";
+
+            LogEntry("STOP", DateTime.Now, DateTime.Now - _startTime);
         }
 
-        private void EnsureLogFile() // Fungsi untuk mengecek keberadaan file csv untuk menyimpan log
+        // Memastikan log CSV telah ada atau buat baru
+        private void EnsureLogFile()
         {
-            if (!File.Exists(_logFile)) // Jika file belum ada maka buat file dan tambahkan isi dari header csv
+            // Jika file belum ada maka buat file dan tambahkan isi dari header csv
+            if (!File.Exists(_logFile))
                 File.WriteAllText(_logFile, "Event,TimeStamp,Duration\r\n");
-            else
-            {
-                var lines = File.ReadAllLines(_logFile); // Membaca file csv
-                foreach (var line in lines)
-                {
-                    if (line.StartsWith("START") || line.StartsWith("STOP")) // Validasi file csv berdasarkan column Event
-                        listLog.Items.Add(line); // Menambahkan log ke dalam listBox dari file csv
-                }
-            }
         }
 
+        // Menambahkan event, beserta dengan waktu kerja ke dalam log
         private void LogEntry(string eventType, DateTime timestamp, TimeSpan? duration = null)
         {
             var line = duration == null
                 ? $"{eventType},{timestamp:yyyy-MM-dd HH:mm:ss}," // Ketika start time
                 : $"{eventType},{timestamp:yyyy-MM-dd HH:mm:ss},{duration:hh\\:mm\\:ss}";
             File.AppendAllText(_logFile, line + "\r\n");
+        }
+
+        // Berhentikan timer ketika form ditutup
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // Stop semua timer saat form ditutup agar tidak tejadi StackOverflowException
+            _timer?.Stop();
+            _screenshotTimer?.Stop();
+            _activityTimer?.Stop();
+
+            // Dispose global hook jika ada
+            _globalHook?.Dispose();
         }
     }
 }

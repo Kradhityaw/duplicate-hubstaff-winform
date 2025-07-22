@@ -9,3 +9,5 @@ C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.csproj.C
 C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.exe
 C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.pdb
 C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.exe.config
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\bin\Debug\Gma.System.MouseKeyHook.dll
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTrac.C23B190A.Up2Date
