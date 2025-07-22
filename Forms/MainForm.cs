@@ -21,53 +21,53 @@ namespace TimeTracker.Forms
         private DateTime _startTime; // Inisialisasi waktu mulai
         private bool _tracking; // Inisialisasi toggle/state tracking
         private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv"); // Inisialisasi csv untuk menyimpan log
-        private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots");
+        private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots"); // Inisialisasi folder untuk menyimpan screenshot
 
         public MainForm()
         {
-            InitializeComponent();
-            SetupTimer();
-            EnsureLogFile();
+            InitializeComponent(); // Insialisasi komponen UI
+            SetupTimer(); // Inisialisasi timer
+            EnsureLogFile(); // Inisialisasi file csv untuk menyimpan aktivitas
         }
 
         private void SetupTimer() // Fungsi untuk setup timer set interval dan event ketika timer berjalan
         {
             _timer = new Timer { Interval = 1000 }; // 1 detik untuk memperbarui User Interface
             _screenshotTimer = new Timer { Interval = 60000 }; // 1 menit untuk setiap waktu mengambil tangkapan layar
-            _timer.Tick += Timer_Tick;
-            _screenshotTimer.Tick += ScreenshotTimer_Tick;
+            _timer.Tick += Timer_Tick; // Menerapkan event _timer.Tick ke method Timer_Tick
+            _screenshotTimer.Tick += ScreenshotTimer_Tick; // Menerapkan event _screenshotTimer.Tick ke method ScreenshotTimer_Tick
         }
 
-        private void ScreenshotTimer_Tick(object sender, EventArgs e)
+        private void ScreenshotTimer_Tick(object sender, EventArgs e) // Fungsi ketika timer dari screenshot berjalan setiap tick berdasarkan interval
         {
             try
             {
-                var timestamp = DateTime.Now;
-                var dateFolder = Path.Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd"));
-                if (!Directory.Exists(dateFolder))
+                var timestamp = DateTime.Now; // Menyimpan waktu untuk nama sub-direktori untuk menyimpan screenshot
+                var dateFolder = Path.Combine(_screenshotDir, timestamp.ToString("yyyy-MM-dd")); // Membuat sub-direktori untuk menyimpan screenshot
+                if (!Directory.Exists(dateFolder)) // Validasi jika direkti screenschot belum ada, maka buat direktori
                     Directory.CreateDirectory(dateFolder);
 
-                var filename = Path.Combine(dateFolder, $"screenshot_{timestamp:HHmmss}.png");
+                var filename = Path.Combine(dateFolder, $"screenshot_{timestamp:HHmmss}.png"); // Membuat filename screenshotnya
 
-                var screenBounds = Screen.PrimaryScreen.Bounds;
-                using (Bitmap bmp = new Bitmap(screenBounds.Width, screenBounds.Height))
+                var screenBounds = Screen.PrimaryScreen.Bounds; // Mengambil screen yang sedang dibuka
+                using (Bitmap bmp = new Bitmap(screenBounds.Width, screenBounds.Height)) // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka tadi
                 {
                     using (Graphics g = Graphics.FromImage(bmp))
                     {
                         g.CopyFromScreen(screenBounds.Location, Point.Empty, screenBounds.Size);
                     }
-                    bmp.Save(filename, ImageFormat.Png);
+                    bmp.Save(filename, ImageFormat.Png); // Menyimpan gambar dengan format .png
                 }
 
-                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}");
+                listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}"); // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
             }
             catch (Exception ex)
             {
-                listLog.Items.Add($"Screenshot error: {ex.Message}");
+                listLog.Items.Add($"Screenshot error: {ex.Message}"); // Memberi log error ke dalam listBox bahwa screenshot gagal diambil
             }
         }
 
-        private void Timer_Tick(object sender, EventArgs e) // Fungsi yang berfungsi ketika timer sedang berjalan
+        private void Timer_Tick(object sender, EventArgs e) // Fungsi ketika timer sedang berjalan
         {
             var elapsed = DateTime.Now - _startTime; // Membuat seperti stopwatch
             labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}"; // Set stopwatch ke label
@@ -92,25 +92,25 @@ namespace TimeTracker.Forms
             _screenshotTimer.Stop();
             var stopTime = DateTime.Now; // Untuk menyimpan waktu berhenti
             var elapsed = stopTime - _startTime; // Untuk menghitung waktu yang telah berlalu
-            _tracking = false;
-            btnStart.Enabled = true;
-            btnStop.Enabled = false;
-            labelStatus.Text = "Not Tracking";
-            LogEntry("STOP", stopTime, elapsed);
-            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}");
+            _tracking = false; // Set state _tracking ke false
+            btnStart.Enabled = true; // Enable button start
+            btnStop.Enabled = false; // Disable button start
+            labelStatus.Text = "Not Tracking"; // Set label status ke "Not Tracking"
+            LogEntry("STOP", stopTime, elapsed); // 
+            listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
         }
 
-        private void EnsureLogFile()
+        private void EnsureLogFile() // Fungsi untuk mengecek keberadaan file csv untuk menyimpan log
         {
             if (!File.Exists(_logFile)) // Jika file belum ada maka buat file dan tambahkan isi dari header csv
                 File.WriteAllText(_logFile, "Event,TimeStamp,Duration\r\n");
             else
             {
-                var lines = File.ReadAllLines(_logFile);
+                var lines = File.ReadAllLines(_logFile); // Membaca file csv
                 foreach (var line in lines)
                 {
-                    if (line.StartsWith("START") || line.StartsWith("STOP"))
-                        listLog.Items.Add(line);
+                    if (line.StartsWith("START") || line.StartsWith("STOP")) // Validasi file csv berdasarkan column Event
+                        listLog.Items.Add(line); // Menambahkan log ke dalam listBox dari file csv
                 }
             }
         }
