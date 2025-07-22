@@ -23,7 +23,7 @@ namespace TimeTracker.Forms
         private Timer _screenshotTimer; // Inisialisasi timer untuk screenshot
         private Timer _activityTimer; // Inisialisasi timer untuk deteksi aktivitas mouse dan keyboard
         private DateTime _startTime; // Inisialisasi waktu mulai
-        private bool _tracking; // Inisialisasi toggle/state tracking
+        private bool _tracking; // Inisialisasi state toggle tracking
         private readonly string _logFile = Path.Combine(Application.StartupPath, "timelog.csv"); // Inisialisasi csv untuk menyimpan log
         private readonly string _screenshotDir = Path.Combine(Application.StartupPath, "Screenshots"); // Inisialisasi folder untuk menyimpan screenshot
 
@@ -104,37 +104,37 @@ namespace TimeTracker.Forms
 
         private void Timer_Tick(object sender, EventArgs e) // Fungsi ketika timer sedang berjalan
         {
-            var elapsed = DateTime.Now - _startTime; // Membuat seperti stopwatch
-            labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}"; // Set stopwatch ke label
+            var elapsed = DateTime.Now - _startTime;
+            labelStatus.Text = $"Tracking: {elapsed:hh\\:mm\\:ss}";
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
             if (_tracking) return; // Jika sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
             _startTime = DateTime.Now; // Menetapkan waktu memulai
-            _timer.Start(); // Menjalankan timer
-            _screenshotTimer.Start(); // Menjalankan timer screenshot
-            _activityTimer.Start(); // Menjalankan timer untuk activity detection
+            _timer.Start();
+            _screenshotTimer.Start();
+            _activityTimer.Start();
             _tracking = true; // Set state _tracking ke true
-            btnStart.Enabled = false; // Disable button start
-            btnStop.Enabled = true; // Enable button stop
+            btnStart.Enabled = false;
+            btnStop.Enabled = true;
             LogEntry("START", _startTime);
         }
 
         private void btnStop_Click(object sender, EventArgs e)
         {
             if (!_tracking) return; // Jika tidak sedang melakukan tracking maka tidak akan menjalankan fungsi dibawahnya
-            _timer.Stop(); // Berhentikan timer
-            _screenshotTimer.Stop(); // Menjalankan timer screenshot
-            _activityTimer.Stop(); // Menjalankan timer untuk activity detection
+            _timer.Stop();
+            _screenshotTimer.Stop();
+            _activityTimer.Stop();
             var stopTime = DateTime.Now; // Untuk menyimpan waktu berhenti
             var elapsed = stopTime - _startTime; // Untuk menghitung waktu yang telah berlalu
             _tracking = false; // Set state _tracking ke false
-            btnStart.Enabled = true; // Enable button start
-            btnStop.Enabled = false; // Disable button start
-            labelStatus.Text = "Not Tracking"; // Set label status ke "Not Tracking"
-            _keyboardActivityCount = 0; // Set state aktivitas keyboard ke 0
-            _mouseActivityCount = 0; // Set state aktivitas mouse ke 0
+            btnStart.Enabled = true;
+            btnStop.Enabled = false;
+            labelStatus.Text = "Not Tracking";
+            _keyboardActivityCount = 0;
+            _mouseActivityCount = 0;
             LogEntry("STOP", stopTime, elapsed);
             listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
         }
