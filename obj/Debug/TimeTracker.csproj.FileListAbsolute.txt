@@ -1,0 +1,11 @@
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\bin\Debug\TimeTracker.exe.config
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\bin\Debug\TimeTracker.exe
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\bin\Debug\TimeTracker.pdb
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.csproj.AssemblyReference.cache
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.Forms.MainForm.resources
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.Properties.Resources.resources
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.csproj.GenerateResource.cache
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.csproj.CoreCompileInputs.cache
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.exe
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.pdb
+C:\Users\Kevind Radhitya\source\repos\TimeTracker\obj\Debug\TimeTracker.exe.config
