@@ -9,7 +9,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Drawing;
 using System.Drawing.Imaging;
 
 namespace TimeTracker.Forms
@@ -47,16 +46,18 @@ namespace TimeTracker.Forms
                 if (!Directory.Exists(dateFolder)) // Validasi jika direkti screenschot belum ada, maka buat direktori
                     Directory.CreateDirectory(dateFolder);
 
-                var filename = Path.Combine(dateFolder, $"screenshot_{timestamp:HHmmss}.png"); // Membuat filename screenshotnya
-
-                var screenBounds = Screen.PrimaryScreen.Bounds; // Mengambil screen yang sedang dibuka
-                using (Bitmap bmp = new Bitmap(screenBounds.Width, screenBounds.Height)) // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka tadi
+                foreach (var screen in Screen.AllScreens) // Mendapatkan tampilan dari semua layar yang terdeteksi
                 {
-                    using (Graphics g = Graphics.FromImage(bmp))
+                    Rectangle bounds = screen.Bounds; // Mendapatkan dimensi dari layar
+                    using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height)) // Membuat bitmap dan mengambil ukuran lebar dan tinggi dari screen yang dibuka
                     {
-                        g.CopyFromScreen(screenBounds.Location, Point.Empty, screenBounds.Size);
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                        }
+                        string fileName = Path.Combine(dateFolder, $"screen_{screen.DeviceName.Replace('\\', '_')}_{timestamp:HHmmss}.png"); // Membuat filename screenshotnya
+                        bmp.Save(fileName, ImageFormat.Png); // Menyimpan gambar dengan format .png
                     }
-                    bmp.Save(filename, ImageFormat.Png); // Menyimpan gambar dengan format .png
                 }
 
                 listLog.Items.Add($"Screenshot saved: {timestamp:HH:mm:ss}"); // Menambahkan log ke dalam listBox bahwa scrennshot berhasil disimpan
@@ -96,7 +97,7 @@ namespace TimeTracker.Forms
             btnStart.Enabled = true; // Enable button start
             btnStop.Enabled = false; // Disable button start
             labelStatus.Text = "Not Tracking"; // Set label status ke "Not Tracking"
-            LogEntry("STOP", stopTime, elapsed); // 
+            LogEntry("STOP", stopTime, elapsed); 
             listLog.Items.Add($"{_startTime:yyyy-MM-dd HH:mm:ss} -> {stopTime:HH:mm:ss} | {elapsed:hh\\:mm\\:ss}"); // Menambahkan log ke dalam listBox
         }
 
